@@ -1,4 +1,4 @@
-{-# LANGUAGE DeriveDataTypeable #-}
+{-# LANGUAGE DeriveDataTypeable, ParallelListComp #-}
 module Main ( main ) where
 
 import Hledger
@@ -20,6 +20,7 @@ import qualified Text.Tabular.AsciiArt as Ascii
 
 data Options = Options
   { cashFlow    :: Bool
+  , debug       :: Bool
   , file        :: FilePath
   , investments :: String
   , pnl         :: String
@@ -60,6 +61,9 @@ options =
      cashFlow = 
       False &= name "c"
       &= help "also show all revant transactions"
+    , debug = 
+      def 
+      &= help "print debugging info"
     , file = 
       def &= name "f"
       &= typFile
@@ -117,6 +121,14 @@ main = bracket (return ()) (\() -> hFlush stdout >> hFlush stderr) $ \() -> do
     putStrLn "No relevant transactions found. Check your investments query"
     exitFailure
   
+  when (debug opts) $ do
+    putStrLn "DEBUG everything:"
+    print $ trans
+    putStrLn "DEBUG just non-PnL transactions:"
+    print $ filter (matchesTransaction (And [investmentsQuery, Not pnlQuery])) trans
+    putStrLn "DEBUG just PnL transactions:"
+    print $ filter (matchesTransaction pnlQuery) trans
+  
   let (requestedInterval, requestedSpan) = intervalAndSpanFromOptions thisDay opts
   let existingSpan = 
         let dates = map transactionDate2 trans in 
@@ -132,15 +144,12 @@ main = bracket (return ()) (\() -> hFlush stdout >> hFlush stderr) $ \() -> do
   tableBody <- (flip mapM) spans $ \(DateSpan (Just ibegin) (Just iend)) -> do
     -- Spans are [b,e)
     let valueBeforeThisPeriod =
-          total trans (And [ investmentsQuery
-                           , Date (openClosedSpan Nothing (Just ibegin))])
+          total trans (And [investmentsQuery, Date (openClosedSpan Nothing (Just ibegin))])
       
-    
-        valueAtTheEndOfPeriod  = 
-          total trans (And [ investmentsQuery  
-                           , Date (openClosedSpan Nothing (Just iend))])
-
-        cashFlowInThisPeriod = 
+    let valueAtTheEndOfPeriod  = 
+          total trans (And [investmentsQuery, Date (openClosedSpan Nothing (Just iend))])
+        
+    let cashFlowInThisPeriod = 
           calculateCashFlow trans (And [ Not (Or [investmentsQuery, pnlQuery]), 
                                          Date (openClosedSpan (Just ibegin) (Just iend)) ] )
     
@@ -194,11 +203,27 @@ timeWeightedReturn opts investmentsQuery trans ibegin iend valueBefore valueAfte
   let s d = show $ roundTo 2 d 
   when (cashFlow opts) $ do
     printf "\nTWR cash flow for %s - %s\n" (showDate ibegin) (showDate iend) 
-    putStrLn $ "Initial value: " ++ s valueBefore ++ " => " ++ s initialUnits ++ " U @ " ++ s initialUnitPrice
-    forM_ (zip cashflow units) $ \((date, amt),(unitsBoughtOrSold, price, unitBalance)) -> do
-      putStrLn (showDate date ++ ": " ++ s amt ++ " => " ++ s unitsBoughtOrSold ++ " U @ " ++ s price ++ ", balance " ++ s unitBalance)
+    let (dates', amounts') = unzip cashflow
+        (unitsBoughtOrSold', unitPrices', unitBalances') = unzip3 units
+        dates = ibegin:dates'
+        amounts = valueBefore:amounts'
+        unitsBoughtOrSold = initialUnits:unitsBoughtOrSold'
+        unitPrices = initialUnitPrice:unitPrices'
+        unitBalances = initialUnits:unitBalances'
+        
+    putStr $ Ascii.render id id id 
+      (Tbl.Table 
+       (Group NoLine (map (Header . showDate) dates))
+       (Group DoubleLine [ Group SingleLine [Header "Unit balance"] 
+                         , Group SingleLine [Header "Cash", Header "Unit price", Header "Units"]
+                         , Group SingleLine [Header "New Unit Balance"]])
+       [ [oldBalance, amt, prc, udelta, balance] | oldBalance <- map s (0:unitBalances)
+                                                 | balance <- map s unitBalances
+                                                 | amt <- map s amounts
+                                                 | prc <- map s unitPrices
+                                                 | udelta <- map s unitsBoughtOrSold ])
 
-    printf "%s U @ %s. Total TWR: %s%%. Duration: %.2f years. Annualized TWR: %.2f%%\n" (s finalUnitBalance) (s finalUnitPrice) (s totalTWR) years annualizedTWR
+    printf "Final unit price: %s/%s=%s U.\nTotal TWR: %s%%.\nPeriod: %.2f years.\nAnnualized TWR: %.2f%%\n\n" (s valueAfter) (s finalUnitBalance) (s finalUnitPrice) (s totalTWR) years annualizedTWR
   
   return annualizedTWR
   
@@ -212,8 +237,13 @@ internalRateOfReturn opts ibegin iend valueBefore valueAfter cashFlowInPeriod = 
 
   when (cashFlow opts) $ do
     printf "\nIRR cash flow for %s - %s\n" (showDate ibegin) (showDate iend) 
-    mapM_ (putStrLn . (\(d, a) -> showDate d ++ ": " ++ show a)) totalCF
-
+    let (dates, amounts) = unzip totalCF
+    putStrLn $ Ascii.render id id id 
+      (Tbl.Table 
+       (Group NoLine (map (Header . showDate) dates))
+       (Group SingleLine [Header "Amount"])
+       (map ((:[]) . show) amounts))
+                             
   -- 0% is always a solution, so require at least something here
   case ridders 0.00001 (0.000001,1000) (interestSum iend totalCF) of
     Root rate -> return ((rate-1)*100)
@@ -238,7 +268,6 @@ calculateCashFlow trans query = map go trans
 
 total :: [Transaction] -> Query -> Quantity
 total trans query = unMix $ sumPostings $ filter (matchesPosting query) $ concatMap realPostings trans
-
     
 unMix :: MixedAmount -> Quantity   
 unMix a = 
