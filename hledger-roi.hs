@@ -1,3 +1,5 @@
+#!/usr/bin/env stack
+-- stack --resolver lts-12.4 script
 {-# LANGUAGE DeriveDataTypeable, ParallelListComp #-}
 module Main ( main ) where
 
