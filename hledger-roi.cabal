@@ -1,0 +1,48 @@
+-- This file has been generated from package.yaml by hpack version 0.28.2.
+--
+-- see: https://github.com/sol/hpack
+--
+-- hash: 8b84e3da9ed7be2d7468b24aa368ba863d57626be15af0887f15a9feecc53607
+
+name:           hledger-roi
+version:        1.0
+synopsis:       compute return-on-investment for your portfolio using IRR and TWR
+description:    hledger-roi utilizes hledger library to give you ability to compute both internal
+                rate of return and time-weighted rate of return for your investments. 
+category:       Finance, Console
+stability:      stable
+homepage:       https://github.com/adept/hledger-roi#readme
+bug-reports:    https://github.com/adept/hledger-roi/issues
+author:         Dmitry Astapov <dastapov@gmail.com>
+maintainer:     Dmitry Astapov <dastapov@gmail.com
+license:        BSD3
+license-file:   LICENSE
+tested-with:    GHC==8.4.3
+build-type:     Simple
+cabal-version:  >= 1.10
+extra-source-files:
+    README.md
+    sample.journal
+
+source-repository head
+  type: git
+  location: https://github.com/adept/hledger-roi
+
+executable hledger-roi
+  main-is: hledger-roi.hs
+  other-modules:
+      Paths_hledger_roi
+  hs-source-dirs:
+      ./.
+  ghc-options: -Wall -fno-warn-unused-do-bind -fno-warn-name-shadowing -fno-warn-missing-signatures -fno-warn-type-defaults -fno-warn-orphans
+  cpp-options: -DVERSION="1.10.99"
+  build-depends:
+      Decimal
+    , base >=4.8 && <4.12
+    , cmdargs
+    , hledger-lib
+    , statistics >=0.10
+    , tabular
+    , text
+    , time
+  default-language: Haskell2010

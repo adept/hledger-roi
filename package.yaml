@@ -1,0 +1,45 @@
+name: hledger-roi
+version: '1.0'
+synopsis: compute return-on-investment for your portfolio using IRR and TWR
+description: |
+ hledger-roi utilizes hledger library to give you ability to compute both internal
+ rate of return and time-weighted rate of return for your investments. 
+category: Finance, Console
+license: BSD3
+author: Dmitry Astapov <dastapov@gmail.com>
+maintainer: Dmitry Astapov <dastapov@gmail.com
+github: adept/hledger-roi
+stability: stable
+tested-with: GHC==8.4.3
+
+extra-source-files:
+- README.md
+- sample.journal
+
+#data-files:
+
+ghc-options:
+- -Wall
+- -fno-warn-unused-do-bind
+- -fno-warn-name-shadowing
+- -fno-warn-missing-signatures
+- -fno-warn-type-defaults
+- -fno-warn-orphans
+
+dependencies:
+- hledger-lib >=1.10.99 && <1.11
+- Decimal
+- statistics >= 0.10
+- base >=4.8 && <4.12
+- time
+- tabular
+- text
+- cmdargs
+
+executables:
+  hledger-roi:
+    source-dirs: .
+    main: hledger-roi.hs
+    cpp-options: -DVERSION="1.10.99"
+    dependencies:
+    - hledger-lib

@@ -56,7 +56,7 @@ intervalAndSpanFromOptions date opts =
      (b, e, False, False, False, True,  Nothing) -> (Just (Years 1),  DateSpan b e)
      (Nothing, Nothing, False, False, False, False, Just pexp) -> 
        let (i, s) = parsePeriodExpr' date (T.pack pexp) in (Just i, s)
-     otherwise -> error "Cannot work with this combination of date/period flags"
+     _ -> error "Cannot work with this combination of date/period flags"
 
 options = 
   Options { 

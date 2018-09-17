@@ -1,0 +1,5 @@
+# stack build plan using GHC 8.4.3 and recent stackage nightly
+
+resolver: lts-12.4
+
+#extra-deps:
