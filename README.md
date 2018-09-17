@@ -116,3 +116,7 @@ Computing IRR/TWR per year:
 # Acknowledgements
 This tool is originally based on `haskell-irr` by Joachim Breitner <mail@joachim-breitner.de>
 Notable changes from `haskell-irr` include ability to operate on hledger queries instead of account names and handling of multi-commodity accounts (provided that all commodities are convertable to a single cost basis).
+
+# References
+* TWR computations used here are described in a lot of detail on http://monevator.com/how-to-unitize-your-portfolio/
+* Good set of articles on IRR, TWR, value of money, disconting, EAR etc on Investopedia: https://www.investopedia.com/exam-guide/cfa-level-1/quantitative-methods/default.asp
