@@ -8,7 +8,7 @@ Any transactions affecting balance of investment account(s) and not originating 
 
 At a minimum, you need to supply hledger query (this could be just an account name) to select your investments via `-i` switch, and another query to identify your profit and loss transactions via `-P` switch.
 
-Tool will compute and display internalized rate of return (IRR) and time-weighted rate of return (TWR) for your investments for the time period requested.
+Tool will compute and display internalized rate of return (IRR) and time-weighted rate of return (TWR) for your investments for the time period requested. Both rates of return are annualized before display, regardless of the length of reporting interval.
 
 # Command line switches
 ```
@@ -115,3 +115,4 @@ Computing IRR/TWR per year:
 
 # Acknowledgements
 This tool is originally based on `haskell-irr` by Joachim Breitner <mail@joachim-breitner.de>
+Notable changes from `haskell-irr` include ability to operate on hledger queries instead of account names and handling of multi-commodity accounts (provided that all commodities are convertable to a single cost basis).
