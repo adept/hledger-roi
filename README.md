@@ -1,6 +1,14 @@
 # hledger-roi
 Hledger Return-on-investment calucator. Does time-weighted (TWR) and money-weighted (IRR) computations
 
+Both IRR and TWR give you useful approximations that you can use to make your investment decision. 
+
+In reality returnon your investments will change day to day. This is really hard to think about, so for simplicity we could instead assume that your investment growns at a constant rate R. We need to choose R in such a way that all your cash contributions to your investment, grown at this rate for the respective periods of time they were invested, give you the current value of this portfolio. This rate is called money-weighted or dollar-weighter rate of return or **internal rate of return -- IRR for short**.
+
+**Time weighted returns (TWR)** on the other hand ignores the effect of cash inflows/outflows, but recognizes that different periods of time have different rates of return and attempts to tell you what is the performance of your investment portfolio over time that you held it. This is also commonly called "return on the first dollar invested".
+
+Good description of differences between IRR and TWR can be found at http://www.merriman.com/investing-101/performance-time-weighted-return-vs-internal-rate-of-return/, and in Investopedia (check references below).
+
 # Usage
 This tool assumes that you have account(s) that hold nothing but your investments and whenever you record current valuation of these inestments you offset unrealized profit and loss into account(s) that, again, hold nothing but unrealized profit and loss.
 
