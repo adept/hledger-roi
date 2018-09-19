@@ -11,6 +11,7 @@ import System.Exit
 import System.IO
 import Data.Time.Calendar
 import Text.Printf
+import Data.Function (on)
 import Data.List
 import Data.Ord
 import Statistics.Math.RootFinding
@@ -180,23 +181,29 @@ main = bracket (return ()) (\() -> hFlush stdout >> hFlush stderr) $ \() -> do
 timeWeightedReturn opts investmentsQuery trans ibegin iend valueBefore valueAfter cashFlowInThisPeriod = do
   let initialUnitPrice = 100
   let initialUnits = valueBefore / initialUnitPrice
-  let cashflow = map (\(d,a) -> (d, negate a)) $ filter ((/=0).snd) cashFlowInThisPeriod
+  let cashflow = 
+        -- Aggregate all entries for a single day, assuming that intraday interest is negligible
+        map (\date_cash -> let (dates, cash) = unzip date_cash in (head dates, sum cash))
+        $ groupBy ((==) `on` fst)
+        $ sortBy (comparing fst) 
+        $ map (\(d,a) -> (d, negate a)) 
+        $ filter ((/=0).snd) cashFlowInThisPeriod
     
   let units = 
         tail $
         (flip scanl) 
-        (0,0,initialUnits)
-        (\(_,_,unitBalance) (date, amt) -> 
+        (0,0,0,initialUnits)
+        (\(_,_,_,unitBalance) (date, amt) -> 
           let valueOnDate = 
                 total trans (And [investmentsQuery, Date (DateSpan Nothing (Just date))])
               unitPrice = if unitBalance == 0.0 then initialUnitPrice else valueOnDate / unitBalance
               unitsBoughtOrSold = amt / unitPrice
           in
-           (unitsBoughtOrSold, unitPrice, unitBalance + unitsBoughtOrSold)
+           (valueOnDate, unitsBoughtOrSold, unitPrice, unitBalance + unitsBoughtOrSold)
         )  
         cashflow
   
-  let finalUnitBalance = if null units then initialUnits else let (_,_,u) = last units in u
+  let finalUnitBalance = if null units then initialUnits else let (_,_,_,u) = last units in u
       finalUnitPrice = valueAfter / finalUnitBalance
       totalTWR = roundTo 2 $ (finalUnitPrice - initialUnitPrice)
       years = (fromIntegral $ diffDays iend ibegin)/365 :: Double
@@ -206,25 +213,28 @@ timeWeightedReturn opts investmentsQuery trans ibegin iend valueBefore valueAfte
   when (cashFlow opts) $ do
     printf "\nTWR cash flow for %s - %s\n" (showDate ibegin) (showDate iend) 
     let (dates', amounts') = unzip cashflow
-        (unitsBoughtOrSold', unitPrices', unitBalances') = unzip3 units
+        (valuesOnDate',unitsBoughtOrSold', unitPrices', unitBalances') = unzip4 units
         dates = ibegin:dates'
         amounts = valueBefore:amounts'
         unitsBoughtOrSold = initialUnits:unitsBoughtOrSold'
         unitPrices = initialUnitPrice:unitPrices'
         unitBalances = initialUnits:unitBalances'
+        valuesOnDate = 0:valuesOnDate'
         
     putStr $ Ascii.render id id id 
       (Tbl.Table 
        (Group NoLine (map (Header . showDate) dates))
-       (Group DoubleLine [ Group SingleLine [Header "Unit balance"] 
+       (Group DoubleLine [ Group SingleLine [Header "Portfolio value", Header "Unit balance"] 
                          , Group SingleLine [Header "Cash", Header "Unit price", Header "Units"]
                          , Group SingleLine [Header "New Unit Balance"]])
-       [ [oldBalance, amt, prc, udelta, balance] | oldBalance <- map s (0:unitBalances)
-                                                 | balance <- map s unitBalances
-                                                 | amt <- map s amounts
-                                                 | prc <- map s unitPrices
-                                                 | udelta <- map s unitsBoughtOrSold ])
-
+       [ [value, oldBalance, amt, prc, udelta, balance] 
+       | value <- map s valuesOnDate
+       | oldBalance <- map s (0:unitBalances)
+       | balance <- map s unitBalances
+       | amt <- map s amounts
+       | prc <- map s unitPrices
+       | udelta <- map s unitsBoughtOrSold ])
+  
     printf "Final unit price: %s/%s=%s U.\nTotal TWR: %s%%.\nPeriod: %.2f years.\nAnnualized TWR: %.2f%%\n\n" (s valueAfter) (s finalUnitBalance) (s finalUnitPrice) (s totalTWR) years annualizedTWR
   
   return annualizedTWR
