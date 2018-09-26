@@ -135,7 +135,7 @@ main = bracket (return ()) (\() -> hFlush stdout >> hFlush stderr) $ \() -> do
   let (requestedInterval, requestedSpan) = intervalAndSpanFromOptions thisDay opts
   let existingSpan = 
         let dates = map transactionDate2 trans in 
-        DateSpan (Just $ minimum dates) (Just $ maximum dates)
+        DateSpan (Just $ minimum dates) (Just $ addDays 1 $ maximum dates)
   let wholeSpan = spanDefaultsFrom requestedSpan existingSpan 
 
   let spans = case requestedInterval of
@@ -145,22 +145,24 @@ main = bracket (return ()) (\() -> hFlush stdout >> hFlush stderr) $ \() -> do
             spanIntersect existingSpan wholeSpan
 
   tableBody <- (flip mapM) spans $ \(DateSpan (Just ibegin) (Just iend)) -> do
-    -- Spans are [b,e)
+    -- Spans are [begin,end), and iend here is 1 days after actual end date we are interested in
     let valueBeforeThisPeriod =
-          total trans (And [investmentsQuery, Date (openClosedSpan Nothing (Just ibegin))])
+          total trans (And [ investmentsQuery
+                           , Date (DateSpan Nothing (Just ibegin))])
       
     let valueAtTheEndOfPeriod  = 
-          total trans (And [investmentsQuery, Date (openClosedSpan Nothing (Just iend))])
+          total trans (And [investmentsQuery, Date (DateSpan Nothing (Just iend))])
         
     let cashFlowInThisPeriod = 
-          calculateCashFlow trans (And [ Not (Or [investmentsQuery, pnlQuery]), 
-                                         Date (openClosedSpan (Just ibegin) (Just iend)) ] )
+          calculateCashFlow trans (And [ Not investmentsQuery
+                                       , Not pnlQuery
+                                       , Date (DateSpan (Just ibegin) (Just iend)) ] )
     
     irr <- internalRateOfReturn opts ibegin iend valueBeforeThisPeriod valueAtTheEndOfPeriod cashFlowInThisPeriod
     twr <- timeWeightedReturn opts investmentsQuery trans ibegin iend valueBeforeThisPeriod valueAtTheEndOfPeriod cashFlowInThisPeriod
     let cashFlowAmt = negate $ sum $ map snd cashFlowInThisPeriod
     return [ showDate ibegin
-           , showDate iend
+           , showDate (addDays (-1) iend)
            , show valueBeforeThisPeriod
            , show cashFlowAmt
            , show valueAtTheEndOfPeriod
@@ -179,6 +181,7 @@ main = bracket (return ()) (\() -> hFlush stdout >> hFlush stderr) $ \() -> do
   putStrLn $ Ascii.render id id id table
 
 timeWeightedReturn opts investmentsQuery trans ibegin iend valueBefore valueAfter cashFlowInThisPeriod = do
+  -- Span is [ibegin,iend), and iend is 1 days after actual end date we are interested in
   let initialUnitPrice = 100
   let initialUnits = valueBefore / initialUnitPrice
   let cashflow = 
@@ -211,15 +214,16 @@ timeWeightedReturn opts investmentsQuery trans ibegin iend valueBefore valueAfte
         
   let s d = show $ roundTo 2 d 
   when (cashFlow opts) $ do
-    printf "\nTWR cash flow for %s - %s\n" (showDate ibegin) (showDate iend) 
+    printf "\nTWR cash flow for %s - %s\n" (showDate ibegin) (showDate (addDays (-1) iend)) 
     let (dates', amounts') = unzip cashflow
         (valuesOnDate',unitsBoughtOrSold', unitPrices', unitBalances') = unzip4 units
-        dates = ibegin:dates'
-        amounts = valueBefore:amounts'
-        unitsBoughtOrSold = initialUnits:unitsBoughtOrSold'
-        unitPrices = initialUnitPrice:unitPrices'
-        unitBalances = initialUnits:unitBalances'
-        valuesOnDate = 0:valuesOnDate'
+        add x lst = if valueBefore/=0 then x:lst else lst
+        dates = add ibegin dates'
+        amounts = add valueBefore amounts'
+        unitsBoughtOrSold = add initialUnits unitsBoughtOrSold'
+        unitPrices = add initialUnitPrice unitPrices'
+        unitBalances = add initialUnits unitBalances'
+        valuesOnDate = add 0 valuesOnDate'
         
     putStr $ Ascii.render id id id 
       (Tbl.Table 
@@ -241,14 +245,15 @@ timeWeightedReturn opts investmentsQuery trans ibegin iend valueBefore valueAfte
   
 
 internalRateOfReturn opts ibegin iend valueBefore valueAfter cashFlowInPeriod = do 
+  -- Span is [ibegin,iend), and iend is 1 days after actual end date we are interested in
   let prefix = (ibegin, negate valueBefore)
 
       postfix = (iend, valueAfter)
 
-      totalCF = sortBy (comparing fst) $ filter ((/=0) . snd) $ prefix : cashFlowInPeriod ++ [postfix]
+      totalCF = filter ((/=0) . snd) $ prefix : (sortBy (comparing fst) cashFlowInPeriod) ++ [postfix]
 
   when (cashFlow opts) $ do
-    printf "\nIRR cash flow for %s - %s\n" (showDate ibegin) (showDate iend) 
+    printf "\nIRR cash flow for %s - %s\n" (showDate ibegin) (showDate (addDays (-1) iend)) 
     let (dates, amounts) = unzip totalCF
     putStrLn $ Ascii.render id id id 
       (Tbl.Table 
@@ -257,13 +262,10 @@ internalRateOfReturn opts ibegin iend valueBefore valueAfter cashFlowInPeriod = 
        (map ((:[]) . show) amounts))
                              
   -- 0% is always a solution, so require at least something here
-  case ridders 0.00001 (0.000001,1000) (interestSum iend totalCF) of
+  case ridders 0.00001 (0.000000000001,10000) (interestSum iend totalCF) of
     Root rate -> return ((rate-1)*100)
-    _ -> error "Error: Failed to find solution."
-
-
-openClosedSpan :: Maybe Day -> Maybe Day -> DateSpan
-openClosedSpan md1 md2 = DateSpan (fmap (addDays 1) md1) (fmap (addDays 1) md2)
+    NotBracketed -> error "Error: No solution -- not bracketed."
+    SearchFailed -> error "Error: Failed to find solution."
 
 
 type CashFlow = [(Day, Quantity)]
