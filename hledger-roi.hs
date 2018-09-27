@@ -63,7 +63,7 @@ options =
   Options { 
      cashFlow = 
       False &= name "c"
-      &= help "also show all revant transactions"
+      &= help "also show all relevant transactions"
     , debug = 
       def 
       &= help "print debugging info"
