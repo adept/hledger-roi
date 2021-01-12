@@ -1,6 +1,6 @@
 # NOW IN HLEDGER
 
-This code had been included in the `hledger` as `hledger roi`. This repository will no longer be updated.
+This code had been included in the `hledger` as `hledger roi` (and many issues have been fixed in it since then). This repository will no longer be updated, and bug fixes will not be back-ported. Use code in `hledger` instead.
 
 # hledger-roi
 Hledger Return-on-investment calucator. Does time-weighted (TWR) and money-weighted (IRR) computations
